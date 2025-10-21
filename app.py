@@ -38,12 +38,22 @@ st.markdown("""
     box-shadow: 0 3px 10px rgba(0,0,0,0.1);
     margin-bottom: 25px;
 }
+
+/* 🌟 Footer Melayang */
 .footer {
+    position: fixed;
+    bottom: 0;
+    left: 0;
+    width: 100%;
+    background: rgba(255,255,255,0.9);
+    backdrop-filter: blur(4px);
     text-align: center;
-    margin-top: 40px;
     font-size: 13px;
-    color: #002244;
     font-weight: 600;
+    color: #002244;
+    padding: 8px 0;
+    border-top: 2px solid rgba(0,87,183,0.3);
+    z-index: 999;
 }
 .flag-id {
     display:inline-block;width:28px;height:18px;
@@ -64,7 +74,7 @@ st.markdown('<div class="title">🗂️ APLIKASI KONVERSI FORMAT ANJAB KE SIASN<
 st.markdown('<div class="subtitle">#SLAVAUKRAINI</div>', unsafe_allow_html=True)
 
 # ==========================================================
-# ⚙️ UTILITAS
+# ⚙️ UTILITAS & LOGIKA EKSTRAKSI
 # ==========================================================
 def load_template_workbook_from_file(path_b64="template_base64.txt"):
     with open(path_b64, "r", encoding="utf-8-sig") as f:
@@ -77,9 +87,6 @@ def get_first_sheet(df_dict):
     first_sheet_name = list(df_dict.keys())[0]
     return df_dict[first_sheet_name], first_sheet_name
 
-# ==========================================================
-# 🔍 FUNGSI EKSTRAKSI CERDAS
-# ==========================================================
 def extract_single_value(df, label):
     rows, cols = df.shape
     label_lower = label.lower().strip()
@@ -167,7 +174,7 @@ def extract_bahan_kerja(df,log_msgs=None):
         if log_msgs: log_msgs.append("⚠️ Label '8 Bahan Kerja' tidak ditemukan.")
         return []
     start_row = label_row + 2
-    start_col = label_col + 3   # kolom F
+    start_col = label_col + 3
     results, first_found = [], False
     for rr in range(start_row, rows):
         if start_col >= cols: break
@@ -200,7 +207,7 @@ def extract_perangkat_kerja(df, log_msgs=None):
         if log_msgs: log_msgs.append("⚠️ Label '9 Perangkat Kerja' tidak ditemukan.")
         return []
     start_row = label_row + 2
-    start_col = label_col + 3   # Kolom F
+    start_col = label_col + 3
     results, first_found = [], False
     for rr in range(start_row, rows):
         if start_col >= cols: break
@@ -301,7 +308,7 @@ if file:
             else: st.info(msg)
 
 # ==========================================================
-# 🖥️ FOOTER 🇮🇩 × 🇺🇦
+# 🖥️ FOOTER 🇮🇩 × 🇺🇦 MELAYANG
 # ==========================================================
 st.markdown('''
 <div class="footer">
