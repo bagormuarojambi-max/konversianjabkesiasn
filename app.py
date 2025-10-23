@@ -38,8 +38,7 @@ st.markdown("""
     box-shadow: 0 3px 10px rgba(0,0,0,0.1);
     margin-bottom: 25px;
 }
-
-/* 🌟 Footer Melayang */
+/* 🌟 Footer melayang */
 .footer {
     position: fixed;
     bottom: 0;
@@ -74,7 +73,7 @@ st.markdown('<div class="title">🗂️ APLIKASI KONVERSI FORMAT ANJAB KE SIASN<
 st.markdown('<div class="subtitle">#SLAVAUKRAINI</div>', unsafe_allow_html=True)
 
 # ==========================================================
-# ⚙️ UTILITAS & LOGIKA EKSTRAKSI
+# ⚙️ UTILITAS
 # ==========================================================
 def load_template_workbook_from_file(path_b64="template_base64.txt"):
     with open(path_b64, "r", encoding="utf-8-sig") as f:
@@ -87,6 +86,68 @@ def get_first_sheet(df_dict):
     first_sheet_name = list(df_dict.keys())[0]
     return df_dict[first_sheet_name], first_sheet_name
 
+# ==========================================================
+# 🔹 Fungsi Ekstraksi Korelasi Jabatan (Smart v5.4)
+# ==========================================================
+def extract_korelasi_jabatan_smart(df, log_msgs=None):
+    rows, cols = df.shape
+    label_row = None
+    for r in range(rows):
+        for c in range(cols):
+            val = df.iat[r, c]
+            if pd.isna(val):
+                continue
+            text = str(val).strip().lower()
+            if text == "12" and c + 1 < cols:
+                next_text = str(df.iat[r, c + 1]).strip().lower()
+                if "korelasi" in next_text and "jabatan" in next_text:
+                    label_row = r
+                    break
+        if label_row is not None:
+            break
+
+    if label_row is None:
+        if log_msgs: log_msgs.append("⚠️ Label '12 Korelasi Jabatan' tidak ditemukan.")
+        return [], []
+
+    header_row = None
+    unit_col = None
+    dalam_col = None
+    for rr in range(label_row + 1, min(rows, label_row + 12)):
+        for cc in range(cols):
+            val = df.iat[rr, cc]
+            if pd.isna(val): 
+                continue
+            s = str(val).strip().lower().replace(" ", "").replace("/", "")
+            if "unitkerjainstansi" in s or ("unitkerja" in s and "instansi" in s):
+                unit_col = cc
+            if "dalamhal" in s:
+                dalam_col = cc
+        if unit_col is not None and dalam_col is not None:
+            header_row = rr
+            break
+
+    if header_row is None:
+        if log_msgs: log_msgs.append("⚠️ Header 'UNIT KERJA / DALAM HAL' tidak ditemukan.")
+        return [], []
+
+    start_row = header_row + 1
+    unit_data, dalam_data = [], []
+    for rr in range(start_row, rows):
+        unit = str(df.iat[rr, unit_col]).strip() if unit_col is not None and unit_col < cols and not pd.isna(df.iat[rr, unit_col]) else ""
+        dalam = str(df.iat[rr, dalam_col]).strip() if dalam_col is not None and dalam_col < cols and not pd.isna(df.iat[rr, dalam_col]) else ""
+        if unit == "" and dalam == "":
+            break
+        unit_data.append(unit)
+        dalam_data.append(dalam)
+
+    if log_msgs:
+        log_msgs.append(f"✅ Korelasi Jabatan ditemukan: total {len(unit_data)} baris data.")
+    return unit_data, dalam_data
+
+# ==========================================================
+# 🔍 Fungsi Ekstraksi Lainnya (IKTISAR, Tanggung Jawab, dst)
+# ==========================================================
 def extract_single_value(df, label):
     rows, cols = df.shape
     label_lower = label.lower().strip()
@@ -130,7 +191,7 @@ def extract_multi_value_smart_last(df, label, right_offset, down_offset, log_msg
         if first_found:
             if pd.isna(v) or str(v).strip()=="": break
             results.append(str(v).strip())
-    if log_msgs: log_msgs.append(f"✅ '{label}' ditemukan (baris {r+1}, kolom {c+1}) {len(results)} data.")
+    if log_msgs: log_msgs.append(f"✅ '{label}' ditemukan ({len(results)} data).")
     return results
 
 def extract_tugas_pokok_multi_smart(df,log_msgs=None):
@@ -154,7 +215,7 @@ def extract_tugas_pokok_multi_smart(df,log_msgs=None):
                         if first_found:
                             if pd.isna(val) or str(val).strip()=="": break
                             results[key].append(str(val).strip())
-                if log_msgs: log_msgs.append(f"✅ 'Tugas Pokok' ditemukan (baris {r+1}, kolom {c+1}).")
+                if log_msgs: log_msgs.append(f"✅ 'Tugas Pokok' ditemukan (baris {r+1}).")
                 return results["A"],results["C"],results["D"],results["E"],results["F"]
     return [],[],[],[],[]
 
@@ -187,8 +248,7 @@ def extract_bahan_kerja(df,log_msgs=None):
             if pd.isna(v) or str(v).strip() == "":
                 break
             results.append(str(v).strip())
-    if log_msgs:
-        log_msgs.append(f"✅ 'Bahan Kerja' ditemukan (baris {label_row+1}, kolom F) dan {len(results)} data diambil.")
+    if log_msgs: log_msgs.append(f"✅ 'Bahan Kerja' ditemukan ({len(results)} data).")
     return results
 
 def extract_perangkat_kerja(df, log_msgs=None):
@@ -220,8 +280,7 @@ def extract_perangkat_kerja(df, log_msgs=None):
             if pd.isna(v) or str(v).strip() == "":
                 break
             results.append(str(v).strip())
-    if log_msgs:
-        log_msgs.append(f"✅ 'Perangkat Kerja' ditemukan (baris {label_row+1}, kolom F) dan {len(results)} data diambil.")
+    if log_msgs: log_msgs.append(f"✅ 'Perangkat Kerja' ditemukan ({len(results)} data).")
     return results
 
 # ==========================================================
@@ -277,7 +336,7 @@ if file:
     if st.button("🚀 Proses & Buat File Output"):
         with st.spinner("🔄 Memproses data..."):
             wb=load_template_workbook_from_file()
-            ws1,ws2=wb["INFOJAB I"],wb["INFOJAB II"]
+            ws1,ws2,ws3=wb["INFOJAB I"],wb["INFOJAB II"],wb["INFOJAB III"]
             log=[]
             val=extract_single_value(df,"IKTISAR JABATAN")
             if val: ws1["B4"]=val; log.append("✅ IKTISAR JABATAN diisi.")
@@ -299,6 +358,13 @@ if file:
             for i,v in enumerate(bk,4): ws2[f"G{i}"]=v
             pk=extract_perangkat_kerja(df,log)
             for i,v in enumerate(pk,4): ws2[f"H{i}"]=v
+
+            # Korelasi Jabatan (INFOJAB III) – mulai dari A3/B3
+            unit_list, dalam_list = extract_korelasi_jabatan_smart(df, log)
+            for i, (unit, dalam) in enumerate(zip(unit_list, dalam_list), start=3):
+                ws3[f"A{i}"] = unit
+                ws3[f"B{i}"] = dalam
+
             buf=io.BytesIO(); wb.save(buf); buf.seek(0)
             out_name=file.name.rsplit(".",1)[0]+"-CONVERTED.xlsx"
             st.download_button("💾 Unduh Hasil Konversi",buf,out_name,mime="application/vnd.ms-excel")
