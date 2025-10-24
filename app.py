@@ -38,7 +38,8 @@ st.markdown("""
     box-shadow: 0 3px 10px rgba(0,0,0,0.1);
     margin-bottom: 25px;
 }
-/* 🌟 Footer melayang */
+
+/* 🌟 Footer Melayang */
 .footer {
     position: fixed;
     bottom: 0;
@@ -87,7 +88,147 @@ def get_first_sheet(df_dict):
     return df_dict[first_sheet_name], first_sheet_name
 
 # ==========================================================
-# 🔹 Fungsi Ekstraksi Korelasi Jabatan (Smart v5.4)
+# 🔍 FUNGSI EKSTRAKSI CERDAS
+# ==========================================================
+def extract_single_value(df, label):
+    rows, cols = df.shape
+    label_lower = label.lower().strip()
+    for r in range(rows):
+        for c in range(cols):
+            val = df.iat[r, c]
+            if pd.isna(val): continue
+            if label_lower in str(val).lower():
+                for offset in range(1, 6):
+                    if c + offset < cols and str(df.iat[r, c + offset]).strip() == ":":
+                        if c + offset + 1 < cols:
+                            return str(df.iat[r, c + offset + 1]).strip()
+                for offset in range(1, 6):
+                    if c + offset < cols and pd.notna(df.iat[r, c + offset]):
+                        v = str(df.iat[r, c + offset]).strip()
+                        if v and v != ":": return v
+    return None
+
+def extract_multi_value_smart_last(df, label, right_offset, down_offset, log_msgs=None):
+    rows, cols = df.shape
+    found=[]
+    for r in range(rows):
+        for c in range(cols):
+            v=df.iat[r,c]
+            if pd.isna(v):continue
+            s=str(v).strip().lower()
+            if s==label.lower() or s.startswith(label.lower()):
+                found.append((r,c))
+    if not found:
+        if log_msgs: log_msgs.append(f"⚠️ Label '{label}' tidak ditemukan.")
+        return []
+    r,c=found[-1]
+    start_row, start_col=r+down_offset, c+right_offset
+    results, first_found=[],False
+    for rr in range(start_row,rows):
+        if start_col>=cols:break
+        v=df.iat[rr,start_col]
+        if not first_found:
+            if pd.isna(v) or str(v).strip()=="": continue
+            first_found=True
+        if first_found:
+            if pd.isna(v) or str(v).strip()=="": break
+            results.append(str(v).strip())
+    if log_msgs: log_msgs.append(f"✅ '{label}' ditemukan (baris {r+1}, kolom {c+1}) {len(results)} data.")
+    return results
+
+def extract_tugas_pokok_multi_smart(df,log_msgs=None):
+    label="tugas pokok"
+    rows,cols=df.shape
+    for r in range(rows):
+        for c in range(cols):
+            v=df.iat[r,c]
+            if pd.isna(v):continue
+            if str(v).strip().lower()==label:
+                start_row=r+3
+                offsets={"A":c+3,"C":c+6,"D":c+7,"E":c+9,"F":c+8}
+                results={k:[] for k in offsets.keys()}
+                for key,col_idx in offsets.items():
+                    first_found=False
+                    for rr in range(start_row,rows):
+                        val=df.iat[rr,col_idx]
+                        if not first_found:
+                            if pd.isna(val) or str(val).strip()=="": continue
+                            first_found=True
+                        if first_found:
+                            if pd.isna(val) or str(val).strip()=="": break
+                            results[key].append(str(val).strip())
+                if log_msgs: log_msgs.append(f"✅ 'Tugas Pokok' ditemukan (baris {r+1}, kolom {c+1}).")
+                return results["A"],results["C"],results["D"],results["E"],results["F"]
+    return [],[],[],[],[]
+
+def extract_bahan_kerja(df,log_msgs=None):
+    rows,cols=df.shape
+    label_row,label_col=None,None
+    for r in range(rows):
+        for c in range(cols):
+            v=df.iat[r,c]
+            if pd.isna(v):continue
+            s=str(v).strip().lower()
+            if s=="8":
+                right_val=df.iat[r,c+1] if c+1<cols else ""
+                if str(right_val).strip().lower()=="bahan kerja":
+                    label_row,label_col=r,c+1
+    if label_row is None:
+        if log_msgs: log_msgs.append("⚠️ Label '8 Bahan Kerja' tidak ditemukan.")
+        return []
+    start_row = label_row + 2
+    start_col = label_col + 3
+    results, first_found = [], False
+    for rr in range(start_row, rows):
+        if start_col >= cols: break
+        v = df.iat[rr, start_col]
+        if not first_found:
+            if pd.isna(v) or str(v).strip() == "":
+                continue
+            first_found = True
+        if first_found:
+            if pd.isna(v) or str(v).strip() == "":
+                break
+            results.append(str(v).strip())
+    if log_msgs:
+        log_msgs.append(f"✅ 'Bahan Kerja' ditemukan (baris {label_row+1}, kolom F) dan {len(results)} data diambil.")
+    return results
+
+def extract_perangkat_kerja(df, log_msgs=None):
+    rows, cols = df.shape
+    label_row, label_col = None, None
+    for r in range(rows):
+        for c in range(cols):
+            v = df.iat[r, c]
+            if pd.isna(v): continue
+            s = str(v).strip().lower()
+            if s == "9":
+                next_val = df.iat[r, c + 1] if c + 1 < cols else ""
+                if str(next_val).strip().lower() == "perangkat kerja":
+                    label_row, label_col = r, c + 1
+    if label_row is None:
+        if log_msgs: log_msgs.append("⚠️ Label '9 Perangkat Kerja' tidak ditemukan.")
+        return []
+    start_row = label_row + 2
+    start_col = label_col + 3
+    results, first_found = [], False
+    for rr in range(start_row, rows):
+        if start_col >= cols: break
+        v = df.iat[rr, start_col]
+        if not first_found:
+            if pd.isna(v) or str(v).strip() == "":
+                continue
+            first_found = True
+        if first_found:
+            if pd.isna(v) or str(v).strip() == "":
+                break
+            results.append(str(v).strip())
+    if log_msgs:
+        log_msgs.append(f"✅ 'Perangkat Kerja' ditemukan (baris {label_row+1}, kolom F) dan {len(results)} data diambil.")
+    return results
+
+# ==========================================================
+# 🔹 Korelasi Jabatan (Smart v5.4)
 # ==========================================================
 def extract_korelasi_jabatan_smart(df, log_msgs=None):
     rows, cols = df.shape
@@ -144,144 +285,6 @@ def extract_korelasi_jabatan_smart(df, log_msgs=None):
     if log_msgs:
         log_msgs.append(f"✅ Korelasi Jabatan ditemukan: total {len(unit_data)} baris data.")
     return unit_data, dalam_data
-
-# ==========================================================
-# 🔍 Fungsi Ekstraksi Lainnya (IKTISAR, Tanggung Jawab, dst)
-# ==========================================================
-def extract_single_value(df, label):
-    rows, cols = df.shape
-    label_lower = label.lower().strip()
-    for r in range(rows):
-        for c in range(cols):
-            val = df.iat[r, c]
-            if pd.isna(val): continue
-            if label_lower in str(val).lower():
-                for offset in range(1, 6):
-                    if c + offset < cols and str(df.iat[r, c + offset]).strip() == ":":
-                        if c + offset + 1 < cols:
-                            return str(df.iat[r, c + offset + 1]).strip()
-                for offset in range(1, 6):
-                    if c + offset < cols and pd.notna(df.iat[r, c + offset]):
-                        v = str(df.iat[r, c + offset]).strip()
-                        if v and v != ":": return v
-    return None
-
-def extract_multi_value_smart_last(df, label, right_offset, down_offset, log_msgs=None):
-    rows, cols = df.shape
-    found=[]
-    for r in range(rows):
-        for c in range(cols):
-            v=df.iat[r,c]
-            if pd.isna(v):continue
-            s=str(v).strip().lower()
-            if s==label.lower() or s.startswith(label.lower()):
-                found.append((r,c))
-    if not found:
-        if log_msgs: log_msgs.append(f"⚠️ Label '{label}' tidak ditemukan.")
-        return []
-    r,c=found[-1]
-    start_row, start_col=r+down_offset, c+right_offset
-    results, first_found=[],False
-    for rr in range(start_row,rows):
-        if start_col>=cols:break
-        v=df.iat[rr,start_col]
-        if not first_found:
-            if pd.isna(v) or str(v).strip()=="": continue
-            first_found=True
-        if first_found:
-            if pd.isna(v) or str(v).strip()=="": break
-            results.append(str(v).strip())
-    if log_msgs: log_msgs.append(f"✅ '{label}' ditemukan ({len(results)} data).")
-    return results
-
-def extract_tugas_pokok_multi_smart(df,log_msgs=None):
-    label="tugas pokok"
-    rows,cols=df.shape
-    for r in range(rows):
-        for c in range(cols):
-            v=df.iat[r,c]
-            if pd.isna(v):continue
-            if str(v).strip().lower()==label:
-                start_row=r+3
-                offsets={"A":c+3,"C":c+6,"D":c+7,"E":c+9,"F":c+8}
-                results={k:[] for k in offsets.keys()}
-                for key,col_idx in offsets.items():
-                    first_found=False
-                    for rr in range(start_row,rows):
-                        val=df.iat[rr,col_idx]
-                        if not first_found:
-                            if pd.isna(val) or str(val).strip()=="": continue
-                            first_found=True
-                        if first_found:
-                            if pd.isna(val) or str(val).strip()=="": break
-                            results[key].append(str(val).strip())
-                if log_msgs: log_msgs.append(f"✅ 'Tugas Pokok' ditemukan (baris {r+1}).")
-                return results["A"],results["C"],results["D"],results["E"],results["F"]
-    return [],[],[],[],[]
-
-def extract_bahan_kerja(df,log_msgs=None):
-    rows,cols=df.shape
-    label_row,label_col=None,None
-    for r in range(rows):
-        for c in range(cols):
-            v=df.iat[r,c]
-            if pd.isna(v):continue
-            s=str(v).strip().lower()
-            if s=="8":
-                right_val=df.iat[r,c+1] if c+1<cols else ""
-                if str(right_val).strip().lower()=="bahan kerja":
-                    label_row,label_col=r,c+1
-    if label_row is None:
-        if log_msgs: log_msgs.append("⚠️ Label '8 Bahan Kerja' tidak ditemukan.")
-        return []
-    start_row = label_row + 2
-    start_col = label_col + 3
-    results, first_found = [], False
-    for rr in range(start_row, rows):
-        if start_col >= cols: break
-        v = df.iat[rr, start_col]
-        if not first_found:
-            if pd.isna(v) or str(v).strip() == "":
-                continue
-            first_found = True
-        if first_found:
-            if pd.isna(v) or str(v).strip() == "":
-                break
-            results.append(str(v).strip())
-    if log_msgs: log_msgs.append(f"✅ 'Bahan Kerja' ditemukan ({len(results)} data).")
-    return results
-
-def extract_perangkat_kerja(df, log_msgs=None):
-    rows, cols = df.shape
-    label_row, label_col = None, None
-    for r in range(rows):
-        for c in range(cols):
-            v = df.iat[r, c]
-            if pd.isna(v): continue
-            s = str(v).strip().lower()
-            if s == "9":
-                next_val = df.iat[r, c + 1] if c + 1 < cols else ""
-                if str(next_val).strip().lower() == "perangkat kerja":
-                    label_row, label_col = r, c + 1
-    if label_row is None:
-        if log_msgs: log_msgs.append("⚠️ Label '9 Perangkat Kerja' tidak ditemukan.")
-        return []
-    start_row = label_row + 2
-    start_col = label_col + 3
-    results, first_found = [], False
-    for rr in range(start_row, rows):
-        if start_col >= cols: break
-        v = df.iat[rr, start_col]
-        if not first_found:
-            if pd.isna(v) or str(v).strip() == "":
-                continue
-            first_found = True
-        if first_found:
-            if pd.isna(v) or str(v).strip() == "":
-                break
-            results.append(str(v).strip())
-    if log_msgs: log_msgs.append(f"✅ 'Perangkat Kerja' ditemukan ({len(results)} data).")
-    return results
 
 # ==========================================================
 # 🧩 ISIAN DEFAULT INFOJAB I
@@ -359,11 +362,10 @@ if file:
             pk=extract_perangkat_kerja(df,log)
             for i,v in enumerate(pk,4): ws2[f"H{i}"]=v
 
-            # Korelasi Jabatan (INFOJAB III) – mulai dari A3/B3
-            unit_list, dalam_list = extract_korelasi_jabatan_smart(df, log)
-            for i, (unit, dalam) in enumerate(zip(unit_list, dalam_list), start=3):
-                ws3[f"A{i}"] = unit
-                ws3[f"B{i}"] = dalam
+            # 🔹 Korelasi Jabatan
+            kj_unit, kj_dalam = extract_korelasi_jabatan_smart(df, log)
+            for i, v in enumerate(kj_unit, 3): ws3[f"A{i}"] = v
+            for i, v in enumerate(kj_dalam, 3): ws3[f"B{i}"] = v
 
             buf=io.BytesIO(); wb.save(buf); buf.seek(0)
             out_name=file.name.rsplit(".",1)[0]+"-CONVERTED.xlsx"
